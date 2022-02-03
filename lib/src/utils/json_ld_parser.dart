@@ -13,13 +13,17 @@ class JsonLdParser {
     var scopes = HtmlQuery.findJsonLds(document);
     List<StructuredData> items = [];
     scopes.forEach((itemscope) {
-      var data = jsonDecode(itemscope.text.replaceAllMapped(
-          breakingLineString, (m) => '${m.group(0)!.replaceAll("\n", "")}'));
-      if (data is List) {
-        items = _extractDataFromList(data);
-      } else {
-        List<StructuredData> schemas = _extractDataFromObject(data);
-        items.addAll(schemas);
+      try {
+        var data = jsonDecode(itemscope.text.replaceAllMapped(
+            breakingLineString, (m) => '${m.group(0)!.replaceAll("\n", "")}'));
+        if (data is List) {
+          items = _extractDataFromList(data);
+        } else {
+          List<StructuredData> schemas = _extractDataFromObject(data);
+          items.addAll(schemas);
+        }
+      } catch (e) {
+        print('Got a malformated json');
       }
     });
 
