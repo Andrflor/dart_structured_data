@@ -6,12 +6,15 @@ import 'package:structured_data/src/utils/parser_helper.dart';
 import '../objects/structured_data.dart';
 import 'html_parser.dart';
 
+final breakingLineString = RegExp(r'[^"]*(?:""[^"]*)*');
+
 class JsonLdParser {
   static List<StructuredData> extractJsonLd(Document document) {
     var scopes = HtmlQuery.findJsonLds(document);
     List<StructuredData> items = [];
     scopes.forEach((itemscope) {
-      var data = jsonDecode(itemscope.text);
+      var data = jsonDecode(itemscope.text.replaceAllMapped(
+          breakingLineString, (m) => '${m.group(0)!.replaceAll("\n", "")}'));
       if (data is List) {
         items = _extractDataFromList(data);
       } else {
