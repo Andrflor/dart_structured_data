@@ -53,18 +53,14 @@ class StructuredData {
     return "StructuredData<$schemaType>";
   }
 
-  List<dynamic> _jsonifyList(List list) {
-    if (list[0] is StructuredData) {
-      return list.map((e) => (e as StructuredData).toJson()).toList();
-    }
-    if (list[0] is List) {
-      return list.map((e) => _jsonifyList(e)).toList();
-    }
-    if (list[0] is Map) {
-      return list.map((e) => _jsonifyMap(e)).toList();
-    }
-    return list;
-  }
+  List<dynamic> _jsonifyList(List list) => list
+      .map((e) => switch (e) {
+            StructuredData() => e.toJson(),
+            List() => _jsonifyList(e),
+            Map() => _jsonifyMap(e as Map<String, dynamic>),
+            _ => e,
+          })
+      .toList();
 
   Map<String, dynamic> _jsonifyMap(Map<String, dynamic> map) {
     var json = Map<String, dynamic>();

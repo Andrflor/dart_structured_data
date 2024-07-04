@@ -6,6 +6,16 @@ import 'package:structured_data/src/utils/parser_helper.dart';
 import '../objects/structured_data.dart';
 import 'html_parser.dart';
 
+final singleCommentRegex = RegExp(r'((?<=[^:])|^)\/\/.*\n');
+final multiCommentRegex = RegExp(r'/\*.*?\*/', dotAll: true);
+final doubleEscapedChar = RegExp(r'\\[^\\"bfnrtu]');
+final bracketOpenRegex = RegExp(r'\{');
+final bracketCloseRegex = RegExp(r'\}');
+final listOpenRegex = RegExp(r'\[');
+final listCloseRegex = RegExp(r'\]');
+final trailingCommaRegex = RegExp(r',\s*([\}\]])');
+final jsonStartRegex = RegExp(r'[\[\{]');
+final jsonEndRegex = RegExp(r'[\]\}]');
 final breakingLineString = RegExp(r'[^"]*(?:""[^"]*)*');
 
 class JsonLdParser {
@@ -14,20 +24,62 @@ class JsonLdParser {
     List<StructuredData> items = [];
     scopes.forEach((itemscope) {
       try {
-        var data = jsonDecode(itemscope.text.replaceAllMapped(
-            breakingLineString, (m) => '${m.group(0)!.replaceAll("\n", "")}'));
+        var data = jsonDecode(cleanJsonString(itemscope.text));
         if (data is List) {
           items = _extractDataFromList(data);
         } else {
           List<StructuredData> schemas = _extractDataFromObject(data);
           items.addAll(schemas);
         }
-      } catch (e) {
-        print('Got a malformated json');
-      }
+      } catch (_) {}
     });
 
     return items;
+  }
+
+  static String cleanJsonString(String input) {
+    String sanitized = input
+        .replaceAll(singleCommentRegex, '')
+        .replaceAll(multiCommentRegex, '')
+        .replaceAllMapped(
+            breakingLineString,
+            (m) =>
+                '${m.group(0)!.replaceAll("\n", "").replaceAll("\t", "").replaceAll("\b", "")}')
+        .replaceAllMapped(
+            doubleEscapedChar, (match) => match.group(0)!.substring(1));
+
+    int startIndex = sanitized.indexOf(jsonStartRegex);
+    int endIndex = sanitized.lastIndexOf(jsonEndRegex);
+    if (startIndex == -1 || endIndex == -1) {
+      throw FormatException(
+          "Invalid JSON: Missing opening or closing brackets");
+    }
+    sanitized = sanitized.substring(startIndex, endIndex + 1);
+
+    sanitized = sanitized.replaceAllMapped(
+        trailingCommaRegex, (match) => match.group(1)!);
+
+    int openingCurlyBrackets = bracketOpenRegex.allMatches(sanitized).length;
+    int closingCurlyBrackets = bracketCloseRegex.allMatches(sanitized).length;
+    int openingSquareBrackets = listOpenRegex.allMatches(sanitized).length;
+    int closingSquareBrackets = listCloseRegex.allMatches(sanitized).length;
+
+    if (openingCurlyBrackets > closingCurlyBrackets) {
+      sanitized += '}' * (openingCurlyBrackets - closingCurlyBrackets);
+    }
+    if (closingCurlyBrackets > openingCurlyBrackets) {
+      sanitized =
+          '{' * (closingCurlyBrackets - openingCurlyBrackets) + sanitized;
+    }
+    if (openingSquareBrackets > closingSquareBrackets) {
+      sanitized += ']' * (openingSquareBrackets - closingSquareBrackets);
+    }
+    if (closingSquareBrackets > openingSquareBrackets) {
+      sanitized =
+          '[' * (closingSquareBrackets - openingSquareBrackets) + sanitized;
+    }
+
+    return sanitized;
   }
 
   static List<StructuredData> _extractDataFromObject(
