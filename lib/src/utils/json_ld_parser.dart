@@ -26,7 +26,7 @@ class JsonLdParser {
       try {
         var data = jsonDecode(cleanJsonString(itemscope.text));
         if (data is List) {
-          items = _extractDataFromList(data);
+          items.addAll(_extractDataFromList(data));
         } else {
           List<StructuredData> schemas = _extractDataFromObject(data);
           items.addAll(schemas);
